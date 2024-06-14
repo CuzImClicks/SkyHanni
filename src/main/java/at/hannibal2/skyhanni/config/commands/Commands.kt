@@ -12,6 +12,8 @@ import at.hannibal2.skyhanni.data.PartyAPI
 import at.hannibal2.skyhanni.data.SackAPI
 import at.hannibal2.skyhanni.data.TitleManager
 import at.hannibal2.skyhanni.data.bazaar.HypixelBazaarFetcher
+import at.hannibal2.skyhanni.events.LorenzChatEvent
+import at.hannibal2.skyhanni.events.WitheredDragonEvent
 import at.hannibal2.skyhanni.features.bingo.card.BingoCardDisplay
 import at.hannibal2.skyhanni.features.bingo.card.nextstephelper.BingoNextStepHelper
 import at.hannibal2.skyhanni.features.chat.Translator
@@ -21,7 +23,10 @@ import at.hannibal2.skyhanni.features.commands.HelpCommand
 import at.hannibal2.skyhanni.features.commands.PartyChatCommands
 import at.hannibal2.skyhanni.features.commands.PartyCommands
 import at.hannibal2.skyhanni.features.commands.WikiManager
+import at.hannibal2.skyhanni.features.dungeon.ArrowStackWaypoints
 import at.hannibal2.skyhanni.features.dungeon.CroesusChestTracker
+import at.hannibal2.skyhanni.features.dungeon.m7.M7SpawnedStatus
+import at.hannibal2.skyhanni.features.dungeon.m7.WitheredDragonInfo
 import at.hannibal2.skyhanni.features.event.diana.AllBurrowsList
 import at.hannibal2.skyhanni.features.event.diana.BurrowWarpHelper
 import at.hannibal2.skyhanni.features.event.diana.DianaProfitTracker
@@ -83,13 +88,17 @@ import at.hannibal2.skyhanni.test.command.TrackSoundsCommand
 import at.hannibal2.skyhanni.utils.APIUtil
 import at.hannibal2.skyhanni.utils.ChatUtils
 import at.hannibal2.skyhanni.utils.LorenzUtils
+import at.hannibal2.skyhanni.utils.OSUtils
 import at.hannibal2.skyhanni.utils.SoundUtils
+import at.hannibal2.skyhanni.utils.StringUtils.toCleanChatComponent
 import at.hannibal2.skyhanni.utils.TabListData
 import at.hannibal2.skyhanni.utils.chat.ChatClickActionManager
 import at.hannibal2.skyhanni.utils.repopatterns.RepoPatternGui
+import net.minecraft.client.Minecraft
 import net.minecraft.command.ICommandSender
 import net.minecraft.util.BlockPos
 import net.minecraftforge.client.ClientCommandHandler
+import kotlin.random.Random
 
 object Commands {
 
@@ -547,6 +556,57 @@ object Commands {
             "shtoggleegglocationdebug",
             "Shows Hoppity egg locations with their internal API names and status.",
         ) { HoppityEggLocations.toggleDebug() }
+        registerCommand(
+            "shcleardragons",
+            "Clears the list of dragons that have spawned"
+        ) {
+            ArrowStackWaypoints.currentDragon = null
+            ArrowStackWaypoints.closestLocation = null
+            ArrowStackWaypoints.shouldTracerSpawnLocation = false
+            WitheredDragonInfo.entries.forEach { it.status = M7SpawnedStatus.DEAD }
+            ChatUtils.chat("Cleared dragons")
+        }
+        registerCommand(
+            "shtestarrowstackwaypoints",
+            "Test the arrow stack waypoints",
+        ) { args ->
+            when (args.size) {
+                0 -> {
+                    ChatUtils.chat("[inDungeon, dragons, disableChecks, simulate, setPrio 0|1]")
+                }
+                1 -> {
+                    when (args[0]) {
+                        "inDungeon" -> ChatUtils.chat("In dungeon: ${ArrowStackWaypoints.inDungeon()}")
+                        "dragons" -> {
+                            WitheredDragonInfo.entries.forEach {
+                                ChatUtils.chat("${it.color.toChatFormatting()}${it.name} - ${it.status}")
+                            }
+                        }
+                        "simulate" -> {
+                            val dragons = WitheredDragonInfo.entries
+                            val dragon = dragons[Random.nextInt(dragons.size)]
+                            dragon.status = M7SpawnedStatus.SPAWNING
+                            WitheredDragonEvent.ChangeEvent(dragon, M7SpawnedStatus.SPAWNING, M7SpawnedStatus.SPAWNING).post()
+                            ChatUtils.chat("Simulated dragon: ${dragon.name}")
+                        }
+                        "disableChecks" -> {
+                            ArrowStackWaypoints.disableChecks = !ArrowStackWaypoints.disableChecks
+                            ChatUtils.chat("Disable checks: ${ArrowStackWaypoints.disableChecks}")
+                        }
+                        else -> ChatUtils.chat("Unknown argument")
+                    }
+                }
+                2 -> {
+                    when (args[0]) {
+                        "setPrio" -> {
+                            ArrowStackWaypoints.prio = args[1].toIntOrNull() ?: 0
+                        }
+                        else -> ChatUtils.chat("Unknown argument")
+                    }
+                }
+            }
+        }
+
     }
 
     private fun internalCommands() {

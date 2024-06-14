@@ -8,8 +8,8 @@ import at.hannibal2.skyhanni.events.DungeonCompleteEvent
 import at.hannibal2.skyhanni.events.DungeonM7Phase5Start
 import at.hannibal2.skyhanni.events.LorenzRenderWorldEvent
 import at.hannibal2.skyhanni.events.LorenzWorldChangeEvent
-import at.hannibal2.skyhanni.events.M7DragonChangeEvent
 import at.hannibal2.skyhanni.events.MobEvent
+import at.hannibal2.skyhanni.events.WitheredDragonEvent
 import at.hannibal2.skyhanni.events.minecraft.packet.PacketReceivedEvent
 import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
 import at.hannibal2.skyhanni.utils.ChatUtils
@@ -49,10 +49,10 @@ object DragonInfoUtils {
             return
         }
 
-        M7DragonChangeEvent(matchedDragon, M7SpawnedStatus.ALIVE).post()
         logSpawn(event.mob, matchedDragon)
 
         matchedDragon.status = M7SpawnedStatus.ALIVE
+        WitheredDragonEvent.ChangeEvent(matchedDragon, M7SpawnedStatus.ALIVE, matchedDragon.status).post()
         matchedDragon.id = id
     }
 
@@ -71,11 +71,11 @@ object DragonInfoUtils {
             ChatUtils.debug("Unknown dragon $id died at ${location.toCleanString()}")
             return
         }
-        val status = if (matchedDragon.deathBox.isInside(location)) M7SpawnedStatus.DEFEATED
-        else M7SpawnedStatus.UNDEFEATED
-        M7DragonChangeEvent(matchedDragon, status)
 
-        matchedDragon.status = status
+        val defeated = matchedDragon.deathBox.isInside(location)
+
+        matchedDragon.defeated = defeated
+        WitheredDragonEvent.DefeatEvent(matchedDragon)
         logKill(event.mob, matchedDragon)
 
         matchedDragon.id = null
@@ -94,8 +94,8 @@ object DragonInfoUtils {
         logParticle(particle, matchedDragon)
         if (matchedDragon == null) return
 
-        M7DragonChangeEvent(matchedDragon, M7SpawnedStatus.SPAWNING).post()
         matchedDragon.status = M7SpawnedStatus.SPAWNING
+        WitheredDragonEvent.ChangeEvent(matchedDragon, M7SpawnedStatus.SPAWNING, matchedDragon.status).post()
     }
 
     private fun checkParticle(particle: S2APacketParticles): Boolean {
@@ -210,7 +210,7 @@ object DragonInfoUtils {
     }
 
     @HandleEvent
-    fun onDragonChange(event: M7DragonChangeEvent) {
+    fun onDragonChange(event: WitheredDragonEvent.ChangeEvent) {
         ChatUtils.debug("${event.dragon} ${event.state}")
     }
 }
