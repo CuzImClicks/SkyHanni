@@ -1,12 +1,15 @@
 package at.hannibal2.skyhanni.features.dungeon
 
-import at.hannibal2.skyhanni.events.LorenzChatEvent
+import at.hannibal2.skyhanni.api.event.HandleEvent
 import at.hannibal2.skyhanni.events.LorenzRenderWorldEvent
 import at.hannibal2.skyhanni.events.LorenzTickEvent
 import at.hannibal2.skyhanni.events.LorenzWorldChangeEvent
-import at.hannibal2.skyhanni.features.dungeon.DungeonAPI.DungeonClass
+import at.hannibal2.skyhanni.events.SecondPassedEvent
+import at.hannibal2.skyhanni.events.WitheredDragonEvent
+import at.hannibal2.skyhanni.features.dungeon.m7.M7SpawnedStatus
+import at.hannibal2.skyhanni.features.dungeon.m7.WitheredDragonInfo
 import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
-import at.hannibal2.skyhanni.utils.LorenzColor
+import at.hannibal2.skyhanni.utils.ChatUtils
 import at.hannibal2.skyhanni.utils.LorenzVec
 import at.hannibal2.skyhanni.utils.RenderUtils.draw3DLine
 import at.hannibal2.skyhanni.utils.RenderUtils.drawColor
@@ -103,79 +106,79 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
 §c§lThe §5§lSOUL §c§ldragon is spawning!
  */
 
-// TODO: Add spawn locations
-enum class WitheredDragon(val spawnLocation: LorenzVec, val color: LorenzColor) {
-    // bmh -> ogrbp <- at
-    FLAME(LorenzVec(85.0, 14.0, 56.0), LorenzColor.GOLD), // orange
-    APEX(LorenzVec(27.0, 14.0, 94.0), LorenzColor.GREEN), // green
-    POWER(LorenzVec(27.0, 14.0, 59.0), LorenzColor.DARK_RED), // red
-    ICE(LorenzVec(84.0, 14.0, 94.0), LorenzColor.AQUA), // blue
-    SOUL(LorenzVec(56.0, 14.0, 125.0), LorenzColor.DARK_PURPLE) // purple
-}
 
-data class ArrowStackLocation(val witheredDragonType: WitheredDragon, val location: LorenzVec)
+data class ArrowStackLocation(val witheredDragonInfo: WitheredDragonInfo, val location: LorenzVec)
 
 @SkyHanniModule
 object ArrowStackWaypoints {
 
-    private val spawnPattern = "§c§lThe §\\w§\\w(?<name>[A-Z]+) §c§ldragon is spawning!".toPattern()
-
-    val locations = arrayOf(
-        ArrowStackLocation(WitheredDragon.ICE, LorenzVec(48, 5, 110)),
-        ArrowStackLocation(WitheredDragon.APEX, LorenzVec(25, 6, 119)),
-        ArrowStackLocation(WitheredDragon.FLAME, LorenzVec(53, 4, 90)),
-        ArrowStackLocation(WitheredDragon.POWER, LorenzVec(18, 5, 84)),
-        ArrowStackLocation(WitheredDragon.POWER, LorenzVec(10, 6, 83)),
-        ArrowStackLocation(WitheredDragon.SOUL, LorenzVec(31, 5, 97)),
-        ArrowStackLocation(WitheredDragon.SOUL, LorenzVec(81, 5, 99))
+    val locations = arrayOf( // +1 y
+        ArrowStackLocation(WitheredDragonInfo.ICE, LorenzVec(48, 6, 110)),
+        ArrowStackLocation(WitheredDragonInfo.APEX, LorenzVec(25, 7, 119)),
+        ArrowStackLocation(WitheredDragonInfo.FLAME, LorenzVec(53, 5, 90)),
+        ArrowStackLocation(WitheredDragonInfo.POWER, LorenzVec(18, 6, 84)),
+        ArrowStackLocation(WitheredDragonInfo.POWER, LorenzVec(10, 7, 83)),
+        ArrowStackLocation(WitheredDragonInfo.SOUL, LorenzVec(31, 6, 97)),
+        ArrowStackLocation(WitheredDragonInfo.SOUL, LorenzVec(81, 6, 99))
     )
 
-    val dragons = arrayListOf<WitheredDragon>()
-
     var closestLocation: ArrowStackLocation? = null
-    var currentDragon: WitheredDragon? = null
+    var currentDragon: WitheredDragonInfo? = null
+    var shouldTracerSpawnLocation = false
+    var disableChecks = false // TODO: remove
+    var prio = 0 // TODO: adjust to pr
 
     // TODO: Only bers and arch setting
     // TODO: Custom Prio settings
     // TODO: enable and disable feature
 
-    @SubscribeEvent
-    fun onChat(event: LorenzChatEvent) {
-        if (!inDungeon()) return
-        val matcher = spawnPattern.matcher(event.message)
-        if (!matcher.find()) return
-        val dragonName = matcher.group("name") ?: return
-        dragons.add(WitheredDragon.entries.find { it.name == dragonName } ?: return)
-
-        val dragsByPrio: List<WitheredDragon> = dragons.sortedBy { it.ordinal }
-        val dragWithHighestPrio: WitheredDragon = if (DungeonAPI.playerClass == DungeonClass.BERSERK) {
-            dragsByPrio.first()
-        } else if (DungeonAPI.playerClass == DungeonClass.ARCHER) {
-            dragsByPrio.last()
-        } else {
-            return
+    @HandleEvent
+    fun onDragonSpawning(event: WitheredDragonEvent.ChangeEvent) {
+        if (!inDungeon() && !disableChecks) return // TODO: remove disableChecks
+        ChatUtils.chat("${event.dragon.color.toChatFormatting()}${event.dragon.name} - ${event.state}") // TODO: remove
+        if (event.state != M7SpawnedStatus.SPAWNING) return
+        // FIXME: (currentDragon?.defeated?.not() == true &&
+        //                 (currentDragon?.status == M7SpawnedStatus.ALIVE || currentDragon?.status != M7SpawnedStatus.SPAWNING))
+        ChatUtils.chat("Spawning: ${event.dragon.name}")
+        
+        val values = WitheredDragonInfo.entries.filter { it.status == M7SpawnedStatus.SPAWNING && !it.defeated }
+        ChatUtils.chat(values.joinToString(" ") { it.name })
+        val sorted = values.sortedBy { it.ordinal }
+        val dragWithHighestPrio = when (DungeonAPI.playerClass) {
+            DungeonAPI.DungeonClass.BERSERK, DungeonAPI.DungeonClass.MAGE -> sorted.first()
+            else -> sorted.last()
         }
 
+        ChatUtils.chat(dragWithHighestPrio.colorName)
+
+        ChatUtils.chat(WitheredDragonInfo.entries.filter { it.status == M7SpawnedStatus.SPAWNING }.joinToString(" ") { it.name })
+        ChatUtils.chat(WitheredDragonInfo.entries.filter { !it.defeated }.joinToString(" "))
+
+        if (dragWithHighestPrio == currentDragon) return
+
+        shouldTracerSpawnLocation = false
+
+        currentDragon = dragWithHighestPrio
+
         closestLocation = locations
-            .filter { it.witheredDragonType == dragWithHighestPrio }
-            .sortedBy { it.location.distance(Minecraft.getMinecraft().thePlayer.position.toLorenzVec()) }
-            .last()
+            .filter { it.witheredDragonInfo == dragWithHighestPrio }
+            .maxBy { it.location.distance(Minecraft.getMinecraft().thePlayer.position.toLorenzVec()) }
     }
 
     @SubscribeEvent
     fun onRenderWorld(event: LorenzRenderWorldEvent) {
-        if (!inDungeon()) return
-        if (closestLocation != null) {
-            event.drawColor(closestLocation!!.location, closestLocation!!.witheredDragonType.color, true, 0.4f)
+        if (!inDungeon() && !disableChecks && currentDragon != null) return // TODO: remove disableChecks
+        if (closestLocation != null && !shouldTracerSpawnLocation) {
+            event.drawColor(closestLocation!!.location, closestLocation!!.witheredDragonInfo.color, true, 0.4f)
             event.draw3DLine(
                 event.exactPlayerEyeLocation(),
                 closestLocation!!.location.add(0.5, 0.5, 0.5),
-                closestLocation!!.witheredDragonType.color.toColor(),
+                closestLocation!!.witheredDragonInfo.color.toColor(),
                 2,
                 false
             )
         }
-        if (currentDragon != null) {
+        if (shouldTracerSpawnLocation) {
             event.drawColor(currentDragon!!.spawnLocation, currentDragon!!.color, false, 0.4f)
             event.draw3DLine(
                 event.exactPlayerEyeLocation(),
@@ -187,15 +190,24 @@ object ArrowStackWaypoints {
         }
     }
 
+    @HandleEvent
+    fun onDragonChange(event: WitheredDragonEvent.ChangeEvent) {
+        if (!inDungeon() && !disableChecks) return
+        if (event.previous != M7SpawnedStatus.SPAWNING || event.dragon != currentDragon) return
+        // currentDragon changes from spawning to alive
+        currentDragon = null
+        closestLocation = null
+        shouldTracerSpawnLocation = false
+    }
+
     @SubscribeEvent
-    fun onTick(event: LorenzTickEvent) {
-        if (!inDungeon() || closestLocation == null) return
+    fun onTick(event: SecondPassedEvent) {
+        if ((!inDungeon() && !disableChecks) || currentDragon == null || shouldTracerSpawnLocation) return
 
         val playerPos = Minecraft.getMinecraft().thePlayer.position.toLorenzVec()
         val distance = playerPos.distance(closestLocation!!.location)
-        if (distance < 1) {
-            currentDragon = closestLocation!!.witheredDragonType
-            closestLocation = null
+        if (distance < 1.5) {
+            shouldTracerSpawnLocation = true
         }
     }
 
@@ -203,14 +215,12 @@ object ArrowStackWaypoints {
     fun onWorldLoad(event: LorenzWorldChangeEvent) {
         closestLocation = null
         currentDragon = null
-        dragons.clear()
     }
 
-    private fun inDungeon(): Boolean {
+    fun inDungeon(): Boolean {
         if (!DungeonAPI.inDungeon()) return false
         if (!DungeonAPI.inBossRoom) return false
         if (!DungeonAPI.isOneOf("M7")) return false
-
         return true
     }
 }
