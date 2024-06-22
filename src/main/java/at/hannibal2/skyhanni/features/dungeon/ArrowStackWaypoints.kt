@@ -2,12 +2,11 @@ package at.hannibal2.skyhanni.features.dungeon
 
 import at.hannibal2.skyhanni.api.event.HandleEvent
 import at.hannibal2.skyhanni.events.LorenzRenderWorldEvent
-import at.hannibal2.skyhanni.events.LorenzTickEvent
 import at.hannibal2.skyhanni.events.LorenzWorldChangeEvent
 import at.hannibal2.skyhanni.events.SecondPassedEvent
 import at.hannibal2.skyhanni.events.WitheredDragonEvent
-import at.hannibal2.skyhanni.features.dungeon.m7.M7SpawnedStatus
 import at.hannibal2.skyhanni.features.dungeon.m7.WitheredDragonInfo
+import at.hannibal2.skyhanni.features.dungeon.m7.WitheredDragonSpawnedStatus
 import at.hannibal2.skyhanni.skyhannimodule.SkyHanniModule
 import at.hannibal2.skyhanni.utils.ChatUtils
 import at.hannibal2.skyhanni.utils.LorenzVec
@@ -126,7 +125,7 @@ object ArrowStackWaypoints {
     var currentDragon: WitheredDragonInfo? = null
     var shouldTracerSpawnLocation = false
     var disableChecks = false // TODO: remove
-    var prio = 0 // TODO: adjust to pr
+    var overrideClass: DungeonAPI.DungeonClass? = null // TODO: adjust to pr
 
     // TODO: Only bers and arch setting
     // TODO: Custom Prio settings
@@ -136,22 +135,22 @@ object ArrowStackWaypoints {
     fun onDragonSpawning(event: WitheredDragonEvent.ChangeEvent) {
         if (!inDungeon() && !disableChecks) return // TODO: remove disableChecks
         ChatUtils.chat("${event.dragon.color.toChatFormatting()}${event.dragon.name} - ${event.state}") // TODO: remove
-        if (event.state != M7SpawnedStatus.SPAWNING) return
+        if (event.state != WitheredDragonSpawnedStatus.SPAWNING) return
         // FIXME: (currentDragon?.defeated?.not() == true &&
         //                 (currentDragon?.status == M7SpawnedStatus.ALIVE || currentDragon?.status != M7SpawnedStatus.SPAWNING))
         ChatUtils.chat("Spawning: ${event.dragon.name}")
         
-        val values = WitheredDragonInfo.entries.filter { it.status == M7SpawnedStatus.SPAWNING && !it.defeated }
+        val values = WitheredDragonInfo.entries.filter { it.status == WitheredDragonSpawnedStatus.SPAWNING && !it.defeated }
         ChatUtils.chat(values.joinToString(" ") { it.name })
         val sorted = values.sortedBy { it.ordinal }
-        val dragWithHighestPrio = when (DungeonAPI.playerClass) {
+        val dragWithHighestPrio = when (overrideClass ?: DungeonAPI.playerClass) {
             DungeonAPI.DungeonClass.BERSERK, DungeonAPI.DungeonClass.MAGE -> sorted.first()
             else -> sorted.last()
         }
 
         ChatUtils.chat(dragWithHighestPrio.colorName)
 
-        ChatUtils.chat(WitheredDragonInfo.entries.filter { it.status == M7SpawnedStatus.SPAWNING }.joinToString(" ") { it.name })
+        ChatUtils.chat(WitheredDragonInfo.entries.filter { it.status == WitheredDragonSpawnedStatus.SPAWNING }.joinToString(" ") { it.name })
         ChatUtils.chat(WitheredDragonInfo.entries.filter { !it.defeated }.joinToString(" "))
 
         if (dragWithHighestPrio == currentDragon) return
@@ -193,7 +192,7 @@ object ArrowStackWaypoints {
     @HandleEvent
     fun onDragonChange(event: WitheredDragonEvent.ChangeEvent) {
         if (!inDungeon() && !disableChecks) return
-        if (event.previous != M7SpawnedStatus.SPAWNING || event.dragon != currentDragon) return
+        if (event.previous != WitheredDragonSpawnedStatus.SPAWNING || event.dragon != currentDragon) return
         // currentDragon changes from spawning to alive
         currentDragon = null
         closestLocation = null
