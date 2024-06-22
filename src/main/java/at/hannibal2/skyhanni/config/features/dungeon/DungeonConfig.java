@@ -9,6 +9,10 @@ import io.github.notenoughupdates.moulconfig.annotations.ConfigLink;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigOption;
 
 public class DungeonConfig {
+    @Expose
+    @ConfigOption(name = "M7", desc = "")
+    @Accordion
+    public M7Config m7config = new M7Config();
 
     @Expose
     @ConfigOption(name = "Clicked Blocks", desc = "Highlight levers, chests, and Wither Essence when clicked in Dungeons.")
@@ -42,7 +46,7 @@ public class DungeonConfig {
     public CleanEndConfig cleanEnd = new CleanEndConfig();
 
     @Expose
-    @ConfigOption(name = "Boss Damage Splash", desc = "Hides damage splashes while inside the boss room (fixes a Skytils feature).")
+    @ConfigOption(name = "Boss Damage Splash", desc = "Hide damage splashes while inside the boss room (fixes a Skytils feature).")
     @ConfigEditorBoolean
     @FeatureToggle
     public boolean damageSplashBoss = false;
@@ -61,7 +65,7 @@ public class DungeonConfig {
 
     @Expose
     @ConfigOption(name = "Architect Notifier",
-        desc = "Notifies you to use the Architect in Dungeons when a puzzle is failed. " +
+        desc = "Notifies you to use the Architect in Dungeons when a puzzle is failed.\n" +
             "§cOnly works when having enough §5Architect First Drafts §cin the sack.")
     @ConfigEditorBoolean
     @FeatureToggle
@@ -116,7 +120,7 @@ public class DungeonConfig {
     public DungeonChestConfig chest = new DungeonChestConfig();
 
     @Expose
-    @ConfigOption(name = "Croesus Chest", desc = "Adds a visual highlight to the Croesus inventory that " +
+    @ConfigOption(name = "Croesus Chest", desc = "Add a visual highlight to the Croesus inventory that " +
         "shows unopened chests.") // TODO move( , "dungeon.croesusUnopenedChestTracker" ,"dungeon.chest.showUnopened" )
     @ConfigEditorBoolean
     @FeatureToggle
